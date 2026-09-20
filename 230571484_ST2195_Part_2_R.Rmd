@@ -1,0 +1,971 @@
+---
+title: "ST2195 Coursework Project Part 2"
+output: pdf_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Part 2A
+
+
+## The objective of this part is to utilize any subset of 5 consecutive years and any other supplementary information provided by Harvard Dataverse. The goal is to identify the best times and days of the week to fly to minimise delays each year.
+
+
+### A function called "install_pkgs" is created which takes a list of package names and check if its installed. If not it will install the package and load it.
+### We will be using the following packages which is stores in a vector called "needed_pkgs":
+### 1. tidyverse – A collection of packages for data manipulation, visualization, and analysis.
+### 2. lubridate – Simplifies working with date and time data.
+### 3. janitor – Cleans messy data, especially column names.
+### 4. stringr – Provides consistent and simple string operations.
+### 5. readr – For reading data efficiently.
+### 6. caret – A powerful package for machine learning workflows, including preprocessing and model training.
+### 7. forcats – For handling and manipulating categorical (factor) variables.
+### 8. glmnet – Used for fitting generalized linear and regularized regression models, such as LASSO and Ridge regression.
+### 9. pROC - Used for evaluating and visualising the performance of classification models.
+### 10. reshape2 - used to prepare data for visualisation
+### We call the "install_pkgs" using "needed_pkgs" to install and load.
+
+```{r}
+
+# Auto-install packages
+install_pkgs <- function(pkgs) {
+  for (pkg in pkgs) {
+    if (!require(pkg, character.only = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+      library(pkg, character.only = TRUE)
+    }
+  }
+}
+
+needed_pkgs <- c("tidyverse", "lubridate", "janitor", "stringr", "readr", "caret",
+                 "forcats", "glmnet", "pROC", "reshape2")
+install_pkgs(needed_pkgs)
+
+
+
+```
+
+
+### "folder_path" defines the folder containing the data.
+### "years" is a list of the needed years.
+### "file_paths" defines the identification of the files of the needed years and it is printed for verification.
+
+```{r}
+# Define the folder path
+folder_path <- "./dataverse_files"
+
+# Define the years we are using
+years <- c(2004, 2005, 2006, 2007, 2008)
+
+# Identify the file paths for these years
+file_paths <- setNames(file.path(folder_path, paste0(years, ".csv")), years)
+
+# Display identified files
+print("Files to be loaded:")
+print(file_paths)
+```
+
+
+### We will Load and store the years data from CSV files.
+### We create an empty list "data" to store the loaded datas for each year.
+### Using a for loop, we iterate through each year and file path from file_paths to read the respective CSV file. We first attempt to read the file using "UTF-8" encoding. If an error occurs, we retry using "Latin-1" encoding.
+### Each successfully loaded data is stored in the "data" list, with the year as the key.
+### After loading each file, we print the number of rows and columns for verification.
+### Finally, a confirmation message is displayed once all files are successfully loaded.
+
+```{r}
+# create empty list to store the data frames
+data <- list()
+
+# Loop through the years and file path
+for (year in names(file_paths)) {
+  file_path <- file_paths[[year]]
+  message("Loading ", year, "...")
+
+  # Try reading with UTF-8, fallback to latin1 if that fails
+  df <- tryCatch({
+    read_csv(file_path, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
+  }, error = function(e) {
+    message("UTF-8 failed for ", year, ". Retrying with latin1...")
+    read_csv(file_path, locale = locale(encoding = "latin1"), show_col_types = FALSE)
+  })
+
+  # Store the data frame in the list
+  data[[year]] <- df
+
+  # Display basic info
+  message(year, " loaded: ", nrow(df), " rows, ", ncol(df), " columns")
+}
+
+message("All files loaded successfully!")
+```
+
+
+### In addition to the yearly flight data, we load the following non-year CSV files:
+### 1. "airports.csv"
+### 2. "carriers.csv"
+### 3. "plane-data.csv"
+### 4. "variable-descriptions.csv"
+### A "tryCatch" block is implemented to ensure successful file loading. The script first attempts to read the files using "UTF-8" encoding. If an error occurs, it retries using "Latin-1" encoding.
+### Once all datas are successfully loaded, a confirmation message is displayed.
+
+```{r}
+
+# Define file paths
+airports_file <- file.path(folder_path, "airports.csv")
+carriers_file <- file.path(folder_path, "carriers.csv")
+plane_data_file <- file.path(folder_path, "plane-data.csv")
+variable_desc_file <- file.path(folder_path, "variable-descriptions.csv")
+
+# Try to load all files with UTF-8 first
+tryCatch({
+  airports <- readr::read_csv(airports_file, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
+  carriers <- readr::read_csv(carriers_file, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
+  plane_data <- readr::read_csv(plane_data_file, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
+  variable_descriptions <- readr::read_csv(variable_desc_file, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
+  
+  message("All non-year datasets loaded successfully!")
+}, error = function(e) {
+  message("UTF-8 failed for non-year files. Retrying with latin1...")
+  
+  airports <- readr::read_csv(airports_file, locale = locale(encoding = "latin1"), show_col_types = FALSE)
+  carriers <- readr::read_csv(carriers_file, locale = locale(encoding = "latin1"), show_col_types = FALSE)
+  plane_data <- readr::read_csv(plane_data_file, locale = locale(encoding = "latin1"), show_col_types = FALSE)
+  variable_descriptions <- readr::read_csv(variable_desc_file, locale = locale(encoding = "latin1"), show_col_types = FALSE)
+  
+  message("All non-year datasets loaded successfully with latin1!")
+})
+```
+
+
+### We will then preview the loaded datasets.
+### To verify that the data has been loaded correctly, we print the first few rows of each dataset.
+### A for loop iterates through the "data" list to display the first 5 rows of each yearly dataset (2004–2008).
+### We also print the first 5 rows of the non-year datas:
+### 1. "airports.csv" – Displays airport-related data.
+### 2. "carriers.csv" – Shows airline carrier information.
+### 3. "plane-data.csv" – Contains details about aircraft.
+### 4. "variable-descriptions.csv" – Provides descriptions of data variables.
+### This will help us to see the contents of the data.
+
+```{r}
+# Preview the first few rows of each year-based dataset
+for (year in names(data)) {
+  cat("\n", year, "DATA PREVIEW:\n")
+  print(head(data[[year]]))
+  cat("\n")
+}
+
+# Preview the non-year datasets
+cat("\nAIRPORTS DATA PREVIEW:\n")
+print(head(airports))
+
+cat("\nCARRIERS DATA PREVIEW:\n")
+print(head(carriers))
+
+cat("\nPLANE DATA PREVIEW:\n")
+print(head(plane_data))
+
+cat("\nVARIABLE DESCRIPTIONS PREVIEW:\n")
+print(head(variable_descriptions))
+```
+
+
+### We will check for missing values in each dataset.
+### Missing values can affect data quality and influence analysis results.
+### To identify missing data, we iterate through each yearly dataset in the data dictionary using a for loop.
+### For each dataset, we use "isna()" to identify missing values and "colsums()" to count the total number of missing entries in each column.
+### The results are printed to help us understand which columns have missing data and whether data cleaning is necessary.
+
+```{r}
+# Check how much data is missing in each year-based dataset
+for (year in names(data)) {
+  cat("\n", year, "MISSING VALUES:\n")
+  print(colSums(is.na(data[[year]])))
+  cat("\n")
+}
+```
+
+
+### A function clean_flight_data(df) is created in R to clean and preprocess flight data.
+
+### The function performs the following cleaning steps:
+### 1. Remove duplicate rows using distinct() to ensure no repeated records are included in the dataset.
+### 2. Remove cancelled flights by filtering rows where Cancelled == 0, since cancelled flights are not relevant for further analysis.
+### 3. Drop rows with missing time-related values, specifically for the following columns: "DepTime", "ArrTime", "ActualElapsedTime", "AirTime", "ArrDelay", and "DepDelay". These variables are essential for accurate analysis.
+### 4. Replace missing values in delay-related columns with 0. The function first checks which of the following columns are present in the dataset: "CarrierDelay", "WeatherDelay", "NASDelay", "SecurityDelay", and "LateAircraftDelay". It then replaces NA values in these columns with 0, assuming missing values indicate no delay.
+### 5. Convert time columns to HH:MM format for consistency. For each time column ("DepTime", "ArrTime", "CRSDepTime", "CRSArrTime") that exists in the dataset: Convert values equal to 2400 to 0000, representing midnight, remove values outside the valid range (0000–2359) by setting them to NA, pad numeric time values with leading zeros using sprintf() to ensure 4-digit formatting, convert the formatted strings to time objects using parse_time() with the format %H%M.
+### 6. Convert categorical columns to string format, ensuring that "TailNum" and "UniqueCarrier" are treated consistently as character variables.
+### The function returns a cleaned version of the input dataset, making it ready for further analysis and modeling.
+
+```{r}
+# Define the flight data cleaning function
+clean_flight_data <- function(df) {
+  
+  df_clean <- df %>%
+    distinct() %>%  # Remove duplicate rows
+    filter(Cancelled == 0) %>%  # Remove cancelled flights
+    drop_na(DepTime, ArrTime, ActualElapsedTime, AirTime, ArrDelay, DepDelay)  # Drop rows with missing time values
+  
+  # Replace NA in delay-related columns with 0 (if they exist)
+  delay_cols <- c("CarrierDelay", "WeatherDelay", "NASDelay", "SecurityDelay", "LateAircraftDelay")
+  delay_cols_present <- intersect(delay_cols, names(df_clean))
+  
+  df_clean <- df_clean %>%
+    mutate(across(all_of(delay_cols_present), ~replace_na(., 0)))
+  
+  # Convert time columns to HH:MM format
+  time_cols <- c("DepTime", "ArrTime", "CRSDepTime", "CRSArrTime")
+  time_cols_present <- intersect(time_cols, names(df_clean))
+  
+  for (col in time_cols_present) {
+    df_clean[[col]] <- ifelse(df_clean[[col]] == 2400, 0, df_clean[[col]])  # Convert 2400 to 0000 (midnight)
+    df_clean[[col]] <- ifelse(between(df_clean[[col]], 0, 2359), df_clean[[col]], NA)  # Remove invalid times
+    df_clean[[col]] <- sprintf("%04d", as.integer(df_clean[[col]]))  # Pad to 4 digits
+    df_clean[[col]] <- parse_time(df_clean[[col]], format = "%H%M")  # Convert to time
+  }
+  
+  # Ensure categorical columns are strings
+  df_clean <- df_clean %>%
+    mutate(
+      TailNum = as.character(TailNum),
+      UniqueCarrier = as.character(UniqueCarrier)
+    )
+  
+  return(df_clean)
+}
+
+```
+
+
+### We will proceed with cleaning flight data for each year.
+### A new list "data_clean" is created to store the cleaned versions of the flight data.
+### Using a for loop, we apply the "clean_flight_data()" function to each yearly dataset in data:
+### 1. The cleaned dataset for each year is stored in "data_clean[year]".
+### 2. The shape (number of rows and columns) of the cleaned dataset is printed for verification.
+### Once all datasets are processed, a confirmation message is displayed.
+### This ensures that all flight data is cleaned and stored separately for further analysis.
+
+```{r}
+# Create an empty list to store the cleaned data
+data_clean <- list()
+
+# Apply the cleaning function to each year-based dataset
+for (year in names(data)) {
+  data_clean[[year]] <- clean_flight_data(data[[year]])
+  message("Cleaned ", year, ": ", nrow(data_clean[[year]]), " rows, ", ncol(data_clean[[year]]), " columns")
+}
+
+message("\nFlight data cleaned successfully!")
+```
+
+
+### After cleaning the flight data, we preview the first 5 rows of the cleaned dataset for each year.
+### Using a for loop, we iterate through "data_clean", which contains the cleaned versions of the datasets.
+### The year is printed as a heading, followed by the first 5 rows of the respective cleaned dataset.
+### This step helps verify that data cleaning was applied correctly.
+
+```{r}
+# Print preview of the cleaned data for each year
+for (year in names(data_clean)) {
+  cat("\n", year, "Cleaned Data Preview:\n")
+  print(head(data_clean[[year]], 5))  # Show first 5 rows
+  cat("\n")
+}
+```
+
+
+### We then clean the non-year datasets – namely, airports, carriers, and plane_data.
+### Each dataset is cleaned separately using the following steps:
+### 1. Cleaning the airports dataset:
+### - We use "mutate()" to replace missing values in the "city" and "state" columns with "Unknown".
+### - Duplicate rows are removed using "distinct()" to ensure each record is unique.
+### 2. Cleaning the carriers dataset:
+### - Rows with missing values in the "Code" column are removed using drop_na(Code), since "Code" is a key identifier.
+### - Duplicate entries are eliminated using "distinct()" to avoid redundancy.
+### 3. Cleaning the plane_data dataset:
+### - Missing values in the "manufacturer" and "model" columns are replaced with "Unknown" using "mutate()".
+### - Rows with missing values in the "year" column are dropped using "drop_na(year)".
+### - Duplicate rows are removed using "distinct()".
+### After these operations, a message confirms that the non-year datasets have been cleaned successfully.
+
+```{r}
+# Clean airports dataset
+airports_clean <- airports %>%
+  mutate(
+    city = ifelse(is.na(city), "Unknown", city),
+    state = ifelse(is.na(state), "Unknown", state)
+  ) %>%
+  distinct()  # Remove duplicate rows
+
+# Clean carriers dataset
+carriers_clean <- carriers %>%
+  drop_na(Code) %>%  # Remove rows where Code is missing
+  distinct()         # Remove duplicates
+
+# Clean plane_data dataset
+plane_data_clean <- plane_data %>%
+  mutate(
+    manufacturer = ifelse(is.na(manufacturer), "Unknown", manufacturer),
+    model = ifelse(is.na(model), "Unknown", model)
+  ) %>%
+  drop_na(year) %>%   # Drop rows where year is missing
+  distinct()          # Remove duplicate rows
+
+message("\nNon-year datasets cleaned successfully!")
+```
+
+
+### After cleaning the yearly flight data, we merge all cleaned datasets into a single DataFrame, "df_all_years" for easier analysis using "bind_rows".
+### We get the total number of rows and columns.
+### We then print the first and last 5 rows of the merged dataset to verify the structure.
+### The total number of rows and columns is displayed to confirm the data was merged correctly.
+
+```{r}
+# Merge all years' cleaned data into a single data frame
+df_all_years <- bind_rows(data_clean, .id = "Year")  # Adds 'Year' column automatically
+
+# Get number of rows and columns
+total_rows <- nrow(df_all_years)
+total_cols <- ncol(df_all_years)
+
+# Print preview: first 5 and last 5 rows
+cat("\nCleaned & Merged Data Preview (", format(total_rows, big.mark = ","), " rows, ", total_cols, " columns):\n", sep = "")
+print(bind_rows(head(df_all_years, 5), tail(df_all_years, 5)))
+```
+
+
+### We then proceed to compute "NetDelay" as the sum of Departure Delay ("DepDelay") and Arrival Delay ("ArrDelay"):
+### This provides an overall measure of delay impact on flights.
+### We then create a TimeInterval column using a vectorized method to categorise the time:
+### - 00:00 - 05:59 → "Night"
+### - 06:00 - 11:59 → "Morning"
+### - 12:00 - 17:59 → "Afternoon"
+### - 18:00 - 23:59 → "Evening"
+### - If "dep_time" is missing, return "Na_character_".
+### We then compute the average net delay for each time interval per year using "group_by(Year, TimeInterval)", "summarise()" and "mean()". The result is stored in "avg_delay_by_time".
+### Finally, we print the computed average delays by time interval for each year.
+
+```{r}
+
+# 1. Compute NetDelay
+df_all_years <- df_all_years %>%
+  mutate(NetDelay = DepDelay + ArrDelay)
+
+# 2. Create TimeInterval column using a fast vectorized method
+df_all_years <- df_all_years %>%
+  mutate(
+    TimeInterval = case_when(
+      is.na(CRSDepTime) ~ NA_character_,
+      hour(CRSDepTime) < 6  ~ "00:00-05:59 (Night)",
+      hour(CRSDepTime) < 12 ~ "06:00-11:59 (Morning)",
+      hour(CRSDepTime) < 18 ~ "12:00-17:59 (Afternoon)",
+      TRUE                  ~ "18:00-23:59 (Evening)"
+    )
+  )
+
+# 3. Compute average NetDelay by Year and TimeInterval
+avg_delay_by_time <- df_all_years %>%
+  group_by(Year, TimeInterval) %>%
+  summarise(AvgNetDelay = mean(NetDelay, na.rm = TRUE), .groups = "drop")
+
+# 4. View the results
+print(avg_delay_by_time)
+```
+
+
+### We will proceed to plot average delay by Time Interval for each year.
+### We create a grouped bar plot using "ggplot" where:
+### 1. The X-axis represents each Year.
+### 2. The Y-axis shows the Average Delay in minutes.
+### 3. The fill is set to "TimeInterval" so that each year contains multiple bars, one for each time interval.
+### We annotate each bar with exact delay values in MM:SS format.
+
+```{r}
+
+
+# Ensure TimeInterval is ordered logically
+avg_delay_by_time$TimeInterval <- factor(avg_delay_by_time$TimeInterval,
+  levels = c("00:00-05:59 (Night)", "06:00-11:59 (Morning)",
+             "12:00-17:59 (Afternoon)", "18:00-23:59 (Evening)")
+)
+
+# Convert AvgNetDelay to MM:SS format
+avg_delay_by_time <- avg_delay_by_time %>%
+  mutate(
+    DelayLabel = sprintf("%02d:%02d mins", floor(AvgNetDelay), round((AvgNetDelay %% 1) * 60))
+  )
+
+
+# Create the grouped bar plot
+ggplot(avg_delay_by_time, aes(x = Year, y = AvgNetDelay, fill = TimeInterval)) +
+  geom_col(position = position_dodge(width = 0.9), width = 0.8) +
+
+  # Add text labels above bars
+  geom_text(aes(label = DelayLabel),
+            position = position_dodge(width = 0.9),
+            vjust = -0.3,
+            size = 3) +
+
+  labs(
+    title = "Average Delay by Time Interval for Each Year",
+    x = "Year",
+    y = "Average Delay (minutes)",
+    fill = "Time Interval"
+  ) +
+  ylim(0, 40) +
+  coord_cartesian(clip = "off") +  # Proper way to avoid label cut-off
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "right",
+    text = element_text(size = 12),
+    panel.grid.major.y = element_line(color = "grey80"),
+    axis.line.y = element_line(color = "black"),
+    axis.line.x = element_line(color = "black"),
+    plot.margin = margin(t = 10, r = 10, b = 10, l = 10),
+    plot.title.position = "plot"
+  )
+
+```
+
+
+### We then determine the best time interval for each year, i.e., the time interval with the lowest average net delay and plot them in a graph.
+### We create a bar plot using "ggplot" where:
+### 1. The X-axis represents each Year.
+### 2. The Y-axis shows the Average Delay in minutes.
+### 3. The fill is set to "TimeInterval" to see which year has which time interval with the lowest delat.
+### We annotate each bar with exact delay values in MM:SS format.
+
+```{r}
+
+
+# Get the best (lowest delay) time interval per year
+best_time_per_year <- avg_delay_by_time %>%
+  group_by(Year) %>%
+  slice_min(order_by = AvgNetDelay, with_ties = FALSE) %>%
+  ungroup()
+
+# Add MM:SS annotation
+best_time_per_year <- best_time_per_year %>%
+  mutate(
+    DelayLabel = sprintf("%02d:%02d mins", floor(AvgNetDelay), round((AvgNetDelay %% 1) * 60))
+  )
+
+# Plot the best time interval per year
+ggplot(best_time_per_year, aes(x = Year, y = AvgNetDelay, fill = TimeInterval)) +
+  geom_col(width = 0.7) +
+
+  # Add MM:SS annotations
+  geom_text(aes(label = DelayLabel),
+            vjust = -0.3,
+            size = 4) +
+
+  labs(
+    title = "Best Time Interval with Lowest Delay Per Year",
+    x = "Year",
+    y = "Average Delay (minutes)",
+    fill = "Time Interval"
+  ) +
+  ylim(0, 6) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text.x = element_text(angle = 0),
+    legend.position = "right",
+    text = element_text(size = 12),
+    panel.grid.major.y = element_line(color = "grey80"),
+    axis.line.y = element_line(color = "black"),
+    axis.line.x = element_line(color = "black"),
+    plot.margin = margin(t = 10, r = 10, b = 10, l = 10)
+  ) +
+  coord_cartesian(clip = "off")  # Prevent text cut-off
+```
+
+
+### We will proceed to compute Average  Delay by day of the week for each year.
+### We will group data by "Year" and "DayOfWeek", then compute the mean NetDelay for each combination and store the results in "avg_delay_by_day".
+### The resulting DataFrame contains "Year", "DayOfWeek", and "NetDelay".
+### We define "day_labels", storing a list of weekday names (Monday to Sunday) for reference.
+### We print "avg_delay_by_day" to preview the computed values.
+
+```{r}
+
+# Compute average net delay per day of the week for each year
+avg_delay_by_day <- df_all_years %>%
+  group_by(Year, DayOfWeek) %>%
+  summarise(AvgNetDelay = mean(NetDelay, na.rm = TRUE), .groups = "drop")
+
+# Add proper weekday labels (1 = Monday, 7 = Sunday)
+day_labels <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+avg_delay_by_day <- avg_delay_by_day %>%
+  mutate(DayLabel = factor(day_labels[DayOfWeek], levels = day_labels))
+
+# View the result
+print(avg_delay_by_day)
+```
+
+
+### We will proceed to plot the graphs of Average Delay by Day of the week for each year.
+### We will create a grouped bar plot using "sns.barplot" where:
+### 1. The X-axis represents each Year.
+### 2. The Y-axis shows the Average Delay in minutes.
+### 3. The fill is set to DayOfWeek, so each year has 7 bars (one for each day), each colored differently.
+### We annotate each bar with exact delay values in MM:SS format.
+
+```{r}
+
+
+# Ensure weekday labels are in the right order
+day_labels <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+avg_delay_by_day <- avg_delay_by_day %>%
+  mutate(
+    DayLabel = factor(day_labels[DayOfWeek], levels = day_labels),
+    DelayLabel = sprintf("%02d:%02d mins", floor(AvgNetDelay), round((AvgNetDelay %% 1) * 60))
+  )
+
+# Create the grouped bar plot
+ggplot(avg_delay_by_day, aes(x = Year, y = AvgNetDelay, fill = DayLabel)) +
+  geom_col(position = position_dodge(width = 0.9), width = 0.8) +
+
+  # Add MM:SS annotations
+  geom_text(
+  aes(label = DelayLabel),
+  position = position_dodge(width = 0.9),
+  angle = 90,
+  hjust = -0.1,
+  size = 2.8
+) +
+
+  labs(
+    title = "Average Delay by Day of the Week for Each Year",
+    x = "Year",
+    y = "Average Delay (minutes)",
+    fill = "Day of the Week"
+  ) +
+  ylim(0, 40) +
+  coord_cartesian(clip = "off") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 15, face = "bold"),
+    axis.title = element_text(size = 13),
+    axis.text.x = element_text(size = 11, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 11),
+    legend.position = "right",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    axis.line.x = element_line(color = "black"),
+    axis.line.y = element_line(color = "black"),
+    panel.grid.major.y = element_line(color = "grey80"),
+    plot.margin = margin(t = 10, r = 10, b = 10, l = 10)
+  )
+```
+
+
+### We then find the day with the lowest average net delay for each year by using "group_by(Year)" "slice_min" to find the index of the day with the least delay in each year. "avg_delay_by_day.loc[...]" extracts the corresponding rows, storing them in "best_day_per_year".
+### The "DayOfWeek" column in "avg_delay_by_day" contains numeric values (0 for Monday, 6 for Sunday). We map these values to their corresponding weekday names using the "day_labels" list.
+### We print "best_day_per_year", showing the "Year", "DayOfWeek", "NetDelay".
+
+```{r}
+
+# Find the best (lowest delay) day per year
+best_day_per_year <- avg_delay_by_day %>%
+  group_by(Year) %>%
+  slice_min(order_by = AvgNetDelay, with_ties = FALSE) %>%
+  ungroup()
+
+# Convert numeric DayOfWeek to weekday names (already in day_labels)
+day_labels <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+best_day_per_year <- best_day_per_year %>%
+  mutate(
+    DayOfWeek = as.integer(DayOfWeek),
+    DayLabel = factor(day_labels[DayOfWeek], levels = day_labels)
+  )
+
+# Show summary table
+print(best_day_per_year %>% select(Year, DayLabel, AvgNetDelay))
+```
+
+
+### We will proceed to plot the Best Day with Lowest Delay per year by doing the following steps:
+### 1. Create a bar plot using "ggplot":
+### - X-axis: Represents the Year.
+### - Y-axis: Represents the Average  Delay (in minutes) for the best day.
+### 2. Annotate bars with exact delay values:
+### - Convert Net Delay (minutes) to MM:SS format.
+### - Display formatted values (MM:SS mins) above each bar.
+
+```{r}
+
+# Ensure DayLabel is a factor with correct weekday order
+day_labels <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+best_day_per_year$DayLabel <- factor(best_day_per_year$DayLabel, levels = day_labels)
+
+# Format delay as MM:SS for annotation
+best_day_per_year <- best_day_per_year %>%
+  mutate(
+    DelayLabel = sprintf("%02d:%02d mins", floor(AvgNetDelay), round((AvgNetDelay %% 1) * 60))
+  )
+
+# Create the plot
+ggplot(best_day_per_year, aes(x = Year, y = AvgNetDelay, fill = DayLabel)) +
+  geom_col(width = 0.7) +
+
+  # Add MM:SS text labels
+  geom_text(aes(label = DelayLabel),
+            vjust = -0.3,
+            size = 4) +
+
+  labs(
+    title = "Best Day with Lowest Delay Per Year",
+    x = "Year",
+    y = "Average Delay (minutes)",
+    fill = "Day of the Week"
+  ) +
+  ylim(0, 18) +
+  coord_cartesian(clip = "off") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 15, face = "bold"),
+    axis.title = element_text(size = 13),
+    axis.text.x = element_text(size = 11),
+    axis.text.y = element_text(size = 11),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+    panel.grid.major.y = element_line(color = "grey80"),
+    axis.line.y = element_line(color = "black"),
+    axis.line.x = element_line(color = "black"),
+    plot.margin = margin(t = 10, r = 10, b = 10, l = 10)
+  )
+```
+
+
+
+# End Of Part 2A
+
+# Part 2B
+
+## The objective of this question is to utilize any subset of 5 consecutive years and any other supplementary information provided by Harvard Dataverse. The goal is to determine whether older planed experience more delays on a year-to-year basis.
+
+
+### We proceed to merge the flight data with plane data in order to calculate the Plane Age by following these steps:
+### 1. Check if "ManufactureYear" exists in the dataset. If "ManufactureYear" is not already a column in "df_all_years", we merge it with "plane_data_clean". The merge is done using a "left_join()": 
+### - TailNum from the flight data (aircraft tail number).
+### - tailnum from the plane data (renamed to "ManufactureYear" after selecting).
+### 2. Compute PlaneAge. We ensure both "Year" and "ManufactureYear" are numeric for accurate calculation. We use "mutate()" to subtract "ManufactureYear" from "Year" to compute the "PlaneAge" of each aircraft.
+### 3. Filter unrealistic or invalid plane ages. We retain only rows where "PlaneAge" is between 0 and 50 years. This removes entries with missing, negative, or extreme values.
+### 4. Preview the cleaned dataset. We use "select()" and "print()" to display the first and last few rows of the relevant columns: "Year", "ManufactureYear", "TailNum", "PlaneAge", and "NetDelay".
+
+```{r}
+
+# If ManufactureYear doesn't exist, merge with plane_data_clean
+if (!"ManufactureYear" %in% names(df_all_years)) {
+  df_all_years <- df_all_years %>%
+    left_join(
+      plane_data_clean %>% select(tailnum, ManufactureYear = year),
+      by = c("TailNum" = "tailnum")
+    )
+}
+
+# Compute PlaneAge (ensure numeric conversion)
+df_all_years <- df_all_years %>%
+  mutate(
+    Year = as.numeric(Year),
+    ManufactureYear = as.numeric(trimws(ManufactureYear)),  # Remove spaces, convert to numeric
+    PlaneAge = Year - ManufactureYear
+  )
+
+# Filter out unrealistic plane ages (e.g., < 0 or > 50)
+df_all_years_clean <- df_all_years %>%
+  filter(!is.na(PlaneAge), PlaneAge >= 0, PlaneAge <= 50)
+
+# Preview cleaned dataset
+print(df_all_years_clean %>% select(Year, ManufactureYear, TailNum, PlaneAge, NetDelay) %>% head())
+print(df_all_years_clean %>% select(Year, ManufactureYear, TailNum, PlaneAge, NetDelay) %>% tail())
+```
+
+
+### We will categorize "PlaneAge" into three age groups to analyze how aircraft age impacts flight delays.
+### The categorization is as follows:
+### 1. <10 years – Newer aircraft
+### 2. 10–20 years – Mid-aged aircraft
+### 3. >20 years – Older aircraft
+### We use the "cut()" function to assign each aircraft to a PlaneAgeCategory based on its calculated age.
+### The following steps are performed:
+### 1. Filter valid entries. We ensure the data used for this analysis contains valid "PlaneAge" values between 0 and 50, and remove rows with NA.
+### 2. Create plane age categories. We use "mutate()" with "cut()" to bin "PlaneAge" into the three categories. Any rows with invalid or missing category assignments are removed with "filter(!is.na(PlaneAgeCategory))".
+### 3. Group and calculate average delay. The dataset is grouped by both "Year" and "PlaneAgeCategory". We calculate the average "NetDelay" for each combination using "summarise()". A new column "DelayLabel" is created using "sprintf()" to format the delay into MM:SS mins.
+### 4. Plot the results using ggplot2:
+### - X-axis: "Year"
+### - Y-axis: Average "NetDelay" (in minutes)
+### - Fill color: "PlaneAgeCategory" to compare the different age groups
+
+```{r}
+
+# Bin PlaneAge into categories (cut creates NA for out-of-range or NA inputs)
+df_all_years_clean <- df_all_years_clean %>%
+  mutate(
+    PlaneAgeCategory = cut(
+      PlaneAge,
+      breaks = c(0, 10, 20, Inf),
+      labels = c("<10 years", "10–20 years", ">20 years"),
+      right = TRUE
+    )
+  ) %>%
+  filter(!is.na(PlaneAgeCategory))  # This removes any leftover NA bins
+
+# Group and compute average delay
+avg_delay_by_age_category_year <- df_all_years_clean %>%
+  group_by(Year, PlaneAgeCategory) %>%
+  summarise(
+    AvgNetDelay = mean(NetDelay, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    DelayLabel = sprintf("%02d:%02d mins", floor(AvgNetDelay), round((AvgNetDelay %% 1) * 60))
+  )
+
+# Plot the graph
+ggplot(avg_delay_by_age_category_year, aes(x = Year, y = AvgNetDelay, fill = PlaneAgeCategory)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.6) +
+  geom_text(
+    aes(label = DelayLabel),
+    position = position_dodge(width = 0.8),
+    angle = 90,
+    hjust = -0.1,
+    size = 3
+  ) +
+  labs(
+    title = "Average Delay by Plane Age Category for Each Year (2004–2008)",
+    x = "Year",
+    y = "Average Delay (minutes)",
+    fill = "Plane Age Category"
+  ) +
+  ylim(0, 30) +
+  coord_cartesian(clip = "off") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 11),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 12),
+    legend.position = "right",
+    panel.grid.major.y = element_line(color = "grey80"),
+    axis.line.x = element_line(color = "black"),
+    axis.line.y = element_line(color = "black"),
+    plot.margin = margin(t = 10, r = 10, b = 10, l = 10)
+  )
+```
+
+# End Of Part 2B
+
+# Part 2C
+
+## The objective of this question is to utilize any subset of 5 consecutive years and any other supplementary information provided by Harvard Dataverse.
+
+## For each year, the goal is to fit a logistic regression model for the probability of diverted US flights using features like attributes of the departure date, the scheduled departure and arrival times, the coordinates and distance between departure and planned arrival airport, and the carrier information. We will then visualise the coefficients across the selected five years.
+
+
+### We will reload the years data from the CSV files again using the same code done in part 2A.
+### This is so that we can use the data thats not been tampered with for the logistic regression.
+
+```{r}
+# Define file path and years
+folder_path <- "./dataverse_files"
+years <- 2004:2008
+file_paths <- setNames(paste0(folder_path, "/", years, ".csv"), years)
+
+# Load data for all years
+data_log <- list()
+
+for (year in years) {
+  cat("Loading", year, "...\n")
+  
+  file_path <- file_paths[[as.character(year)]]
+  
+  tryCatch({
+    df <- read_csv(file_path, col_types = cols(.default = col_guess()))
+  }, error = function(e) {
+    cat("UTF-8 failed for", year, ". Retrying with latin1...\n")
+    df <<- read_csv(file_path, locale = locale(encoding = "Latin1"), col_types = cols(.default = col_guess()))
+  })
+  
+  data_log[[as.character(year)]] <- df
+  cat(year, "loaded:", nrow(df), "rows,", ncol(df), "columns\n")
+}
+
+cat("All files loaded successfully!\n")
+
+```
+
+
+### We will train a logistic regression model for each year and visualize the coefficients and AUC scores.
+### We define "columns_needed" which includes both numerical and categorical variables relevant for modeling, along with the target variable "Diverted".
+### We initialize storage objects, "all_data" to collect the cleaned data across years, "coefficients_list" to store model coefficients, "years_list" to track years, and "auc_scores" to record AUC values.
+### "categorical_cols" is defined to specify which columns will be treated as categorical variables (excluding "Month" and "DayofMonth", which remain numeric).
+### A for-loop is used to iterate through each year in the dataset:
+### 1. The dataset for the current year is loaded from "data_log".
+### 2. Only the relevant columns are selected using "select()" and rows with missing values are removed using "drop_na()".
+### 3. The categorical columns are converted into integer codes using "as.factor()" and "as.integer()" to prepare them for modeling.
+### 4. The feature matrix "X" is created by removing the "Diverted" and "Year" columns. The target vector "y" is extracted from the "Diverted" column and converted to numeric.
+### 5. The dataset is split into training and testing sets using "createDataPartition()" with an 80:20 ratio.
+### 6. The training and testing feature sets are standardized (mean = 0, SD = 1) using the "preProcess()" function from the caret package.
+### 7. A logistic regression model is trained using "glmnet()" with a binomial family, no regularization penalty (alpha = 0), and lambda set to 0 (i.e., equivalent to standard logistic regression).
+### 8. Predicted probabilities for the test set are obtained using "predict(..., type = 'response')".
+### 9. The AUC score is calculated using the "auc()" function and added to "auc_scores".
+### 10. The model coefficients (excluding the intercept) are extracted using "coef()" and stored in "coefficients_list" with corresponding feature names.
+### 11. The coefficients and AUC score for the year are printed in a formatted manner using "cat()" and "sprintf()".
+
+
+```{r}
+
+
+# Define needed columns
+columns_needed <- c("Month", "DayofMonth", "CRSDepTime", "CRSArrTime", "Distance", 
+                    "UniqueCarrier", "Origin", "Dest", "Year", "Diverted")
+
+# Store all processed data and coefficients
+all_data <- data.frame()
+coefficients_list <- list()
+years_list <- c()
+auc_scores <- c()
+
+# Specify categorical columns (excluding Month/Day which we'll keep numeric)
+categorical_cols <- c("UniqueCarrier", "Origin", "Dest")
+
+# Prepare to collect all predictions and labels
+all_probs <- c()
+all_labels <- c()
+
+# Process each year's dataset
+for (year in years) {
+  cat("Processing", year, "...\n")
+  df_year <- data_log[[as.character(year)]]
+
+  # Filter required columns and remove NAs
+  df_year <- df_year %>%
+    select(any_of(columns_needed)) %>%
+    drop_na()
+
+  # Convert categorical columns to integer codes
+  df_year[categorical_cols] <- lapply(df_year[categorical_cols], function(x) as.integer(as.factor(x)))
+
+  # Prepare feature matrix and target
+  X <- df_year %>% select(-Diverted, -Year)
+  y <- as.numeric(df_year$Diverted)
+
+  # Split data
+  set.seed(42)
+  train_index <- createDataPartition(y, p = 0.8, list = FALSE)
+  X_train <- X[train_index, ]
+  X_test <- X[-train_index, ]
+  y_train <- y[train_index]
+  y_test <- y[-train_index]
+
+  # Scale features
+  preProc <- preProcess(X_train, method = c("center", "scale"))
+  X_train_scaled <- predict(preProc, X_train)
+  X_test_scaled <- predict(preProc, X_test)
+
+  # Train logistic regression model using glmnet (ridge, no penalty)
+  model <- glmnet(as.matrix(X_train_scaled), y_train, family = "binomial", alpha = 0, lambda = 0)
+
+  # Predict probabilities for AUC
+  y_prob <- predict(model, newx = as.matrix(X_test_scaled), type = "response")
+  
+  # Store for combined ROC
+  all_probs <- c(all_probs, as.numeric(y_prob))    
+  all_labels <- c(all_labels, y_test)  
+
+  # Compute AUC
+  auc_score <- auc(y_test, as.numeric(y_prob))
+  auc_scores <- c(auc_scores, auc_score)
+
+  # Store coefficients (excluding intercept)
+  coef_vector <- as.vector(coef(model))[-1]
+  names(coef_vector) <- colnames(X_train_scaled)
+  coefficients_list[[as.character(year)]] <- coef_vector
+  years_list <- c(years_list, year)
+
+  cat("Model trained for", year, "\n")
+  cat("Coefficients:\n")
+  for (i in seq_along(coef_vector)) {
+    cat(sprintf("%-15s : % .4f\n", names(coef_vector)[i], coef_vector[i]))
+  }
+  cat(sprintf("AUC Score for %s : %.3f\n", year, auc_score),"\n")
+
+}
+```
+
+
+### We will now visualize how the coefficients for each feature change across the years using a grouped bar chart.
+### We first convert the list of coefficient vectors "coefficients_list" into a DataFrame using "do.call(rbind, ...)", stacking them by row.
+### Column names are assigned using the names of the first element in the list to retain feature names.
+### We add a new column "Year" using the values stored in "years_list" to associate each row of coefficients with its corresponding year.
+### The data is reshaped from wide format to long format using the "melt()" function from the reshape2 or data.table package, creating a structure suitable for grouped bar plotting with ggplot.
+### Using "ggplot()", we construct a grouped bar plot:
+### 1. "Year" is mapped to the x-axis (converted to a factor for categorical spacing).
+### 2. "Coefficient" is mapped to the y-axis, and "Feature" determines the color fill.
+
+```{r}
+
+# Convert coefficients to DataFrame
+coeffs_df <- do.call(rbind, coefficients_list)
+colnames(coeffs_df) <- names(coefficients_list[[1]])
+coeffs_df <- data.frame(Year = years_list, coeffs_df)
+
+# Long format for plotting
+coeffs_long <- melt(coeffs_df, id.vars = "Year", variable.name = "Feature", value.name = "Coefficient")
+
+# Plot
+ggplot(coeffs_long, aes(x = factor(Year), y = Coefficient, fill = Feature)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.7) +
+  labs(
+    title = "Logistic Regression Coefficients Across Years",
+    x = "Year", y = "Coefficient Value", fill = "Feature"
+  ) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+### We will plot a general ROc Curve for all years combined to have visualisation and to see the overall AUC score.
+
+```{r}
+roc_combined <- roc(all_labels, all_probs)
+
+
+# Plot matching Python style
+plot(
+  roc_combined,
+  legacy.axes = TRUE,                         # Use FPR instead of specificity
+  col = "#1f77b4",                            # Blue line
+  lwd = 2,                                    # Line width
+  main = "ROC Curve - All Years Combined",   # Title
+  xlab = "False Positive Rate (Positive label: 1)",
+  ylab = "True Positive Rate (Positive label: 1)",
+)
+
+# Add AUC legend
+legend(
+  "bottomright",
+  legend = sprintf("AUC = %.3f", auc(roc_combined)),
+  col = "#1f77b4",
+  lwd = 2
+)
+```
+# End Of Part 2c
+
+---
+This is the end of Part 2 of the coursework.
+---
