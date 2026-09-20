@@ -73,44 +73,56 @@ The analysis involved processing several million flight records per year.
 
 ## Key Findings
 
-### Best Time to Fly
+### 🕐 Best Time to Fly
 
-Flights departing during the **night/early-morning period (00:00–05:59)** consistently experienced the lowest average delays across the analysed years.
+Flights departing during the **night period (00:00–05:59)** consistently recorded the lowest average delays across all five years.
 
-Evening flights generally experienced higher delays.
+In contrast, **evening flights (18:00–23:59)** experienced the highest average delays each year, suggesting that delays tend to accumulate throughout the day.
+
+![Average Delay by Time Interval](images/avg_delay_by_time_part2a.png)
 
 ### Best Day to Fly
 
-**Saturday** recorded the lowest average delays from **2004–2007**, while **Wednesday** had the lowest average delay in **2008**.
+**Saturday** recorded the lowest average delay from **2004–2007**, while **Wednesday** recorded the lowest average delay in **2008**.
+
+The results show that average delays varied considerably depending on the day of the week and year.
+
+![Average Delay by Day of Week](images/avg_delay_by_day_part2a.png)
 
 ### Aircraft Age & Delays
 
-Aircraft were grouped into:
+Aircraft were grouped into three age categories:
 
 - **New:** less than 10 years old
 - **Mid-aged:** 10–20 years old
 - **Old:** more than 20 years old
 
-The relationship between aircraft age and delays varied across the analysed years. Older aircraft showed higher average delays in some periods, but the results do not establish aircraft age as the sole cause of delays.
+The relationship between aircraft age and delays changed across the five-year period. Older aircraft did not consistently experience greater delays in the earlier years, although they recorded the highest average delays in **2007 and 2008**.
+
+This suggests that aircraft age alone is not sufficient to explain flight delays, as other operational factors may also influence delay performance.
+
+![Average Delay by Aircraft Age](images/avg_delay_by_plane_part2b.png)
 
 ### Flight Diversion Prediction
 
 Logistic regression models were developed to estimate the probability of a flight being diverted.
 
-Features included:
+The models used features including:
 
-- Month
-- Day of month
-- Scheduled departure time
-- Scheduled arrival time
+- Month and day of month
+- Scheduled departure and arrival times
 - Flight distance
 - Airline carrier
 - Origin airport
 - Destination airport
 
-Yearly models achieved ROC-AUC scores of approximately **0.60–0.64**, while the combined five-year model achieved an ROC-AUC of approximately **0.62**.
+Across the yearly models, **flight distance and scheduled arrival time showed consistently positive coefficients**, while scheduled departure time showed a negative relationship with diversion probability.
 
-The results indicate some predictive ability, while also suggesting that additional variables such as weather and airport conditions could improve model performance.
+![Logistic Regression Coefficients](images/log_reg_part2c.png)
+
+Yearly models achieved ROC-AUC scores of approximately **0.60–0.64**, while the combined five-year model achieved approximately **0.62 ROC-AUC**.
+
+These results indicate some predictive ability, while also suggesting that additional variables such as weather and airport conditions could improve diversion prediction.
 
 ## Repository Contents
 
