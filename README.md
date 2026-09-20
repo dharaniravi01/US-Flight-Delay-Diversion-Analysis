@@ -21,6 +21,9 @@ The analysis focuses on three main questions:
 
 The project uses US commercial flight data from the **2009 ASA Statistical Computing and Graphics Data Expo**, covering the years **2004–2008**.
 
+**Data source:** Harvard Dataverse  
+**Dataset DOI:** https://doi.org/10.7910/DVN/HG7NV7
+
 The yearly datasets contain millions of flight records and include information such as:
 
 - Scheduled and actual departure/arrival times
@@ -33,7 +36,7 @@ The yearly datasets contain millions of flight records and include information s
 
 Additional aircraft data was used to estimate aircraft age.
 
-> Raw datasets are not included in this repository due to their size.
+> **Note:** Raw datasets are not included in this repository due to their size. They can be obtained from the dataset source above.
 
 ## Technologies Used
 
